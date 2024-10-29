@@ -7,20 +7,15 @@ def runif_in_simplex(d):
     k = np.random.exponential(scale=1.0, size=d)
     return k / sum(k)
 
-# def generate_psd(D):
-#     #A = np.random.rand(2*D, D)
-#     return qutip.rand_dm(D)
-#     #return np.matmul(np.transpose(A), A)
-
 def generate_psd(D):
     qobj_density_matrix = qutip.rand_dm(D)
     return qobj_density_matrix.full()
 
-def f(X, As, P, a):
+def f(sigma, rhos, P, a):
     ans = 0
     for i in range(len(P)):
-        ans += P[i] * np.log(np.trace(linalg.fractional_matrix_power(As[i], a) @ linalg.fractional_matrix_power(X, 1-a))) / (a - 1)
-    return ans
+        ans += P[i] * np.log(np.trace(rhos[i] @ linalg.fractional_matrix_power(sigma, 1-a)))
+    return ans / (a - 1)
 
 def h(x, y, a):
     if x == y:
@@ -45,47 +40,47 @@ def h(x, y, a):
 #             rX += P[j] * ei * (ui @ ui.H)
 #     return ans
 
-def step(X, As, P, a):
-    D = X.shape[0]
+def step(sigma, rhos, P, a):
+    D = sigma.shape[0]
     ans = np.zeros((D, D))
     for i in range(len(P)):
-        ans = ans + P[i] * linalg.fractional_matrix_power(As[i], a) / np.trace(linalg.fractional_matrix_power(As[i], a) @ linalg.fractional_matrix_power(X, 1-a))
+        ans = ans + P[i] * rhos[i] / np.trace(rhos[i] @ linalg.fractional_matrix_power(sigma, 1-a))
     ans = linalg.fractional_matrix_power(ans, 1/a)
     return ans
 
 # Experiment parameters
-D = 2**6
-m = 2**8
+D = 2**7
+m = 2**5
 alphas = [0.8, 1.1, 1.4, 1.7, 2]
 
 
-As = []
+global_rhos = []
 for i in range(m):
-    A = generate_psd(D)
-    A /= np.trace(A)
-    As.append(A)
-
+    rho = generate_psd(D)
+    rho /= np.trace(rho)
+    global_rhos.append(rho)
 
 alphas = [0.8,1.1,1.4,1.7,2]
+P = runif_in_simplex(m)
 # Loop over different values of alpha
 for alpha in alphas:
-    P = runif_in_simplex(m)
-    X = np.identity(D) / D
+    rhos = []
+    for i in range(m):
+        rhos.append(linalg.fractional_matrix_power(global_rhos[i],alpha)) # Taking matrix power of supported states beforehand
+    
+    sigma = np.identity(D) / D
     # Arrays to store iteration results
     iterations = [0]
-    f_values = [f(X / np.trace(X), As, P, alpha)]
+    f_values = [f(sigma / np.trace(sigma), rhos, P, alpha)]
 
     # Perform the iterative process
     T = 10
     for i in range(T):
-        X = step(X, As, P, alpha)
+        sigma = step(sigma, rhos, P, alpha)
         iterations.append(i+1)
-        f_val = f(X / np.trace(X), As, P, alpha)
-        #grad = gradf(X, As, P, alpha)
-        #norm_log = np.log(linalg.norm(-grad, ord=2))
+        f_val = f(sigma / np.trace(sigma), rhos, P, alpha)
         f_values.append(f_val)
         print(alpha,f_val)
-        #norm_logs.append(norm_log)
 
     min_f_val = min(f_values)
     for i in range(len(f_values)):
@@ -100,11 +95,11 @@ for alpha in alphas:
     # f(X) vs iteration with log-scale y-axis
     # plt.subplot(1, 2, 1)
     plt.plot(iterations, f_values, label=f'f(X), alpha={alpha}')
-    plt.xlabel('Iteration')
-    plt.ylabel('approx. optimization error')
+    plt.xlabel('Iteration',fontsize=20)
+    plt.ylabel('f(X/tr(X))-f*',fontsize=20)
     plt.yscale('log')  # Set log scale for y-axis
     plt.ylim(1e-11,1e-3)
-    plt.title(f'f(X/tr(X)) vs Iteration (Log Scale) for alpha={alpha}')
+    plt.tick_params(axis='both',which='major',labelsize=12)
     plt.grid(True)
 
     # # Log of norm vs iteration with log-scale y-axis
