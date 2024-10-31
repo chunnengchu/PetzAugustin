@@ -49,8 +49,8 @@ def SimpleIteration(sigma, rhos, P, a):
     return ans
 
 # Experiment parameters
-D = 2**7
-m = 2**5
+D = 2**7 # Quantum state dimension
+N = 2**5 # Cardinality of alphabet
 alphas = [0.8, 1.1, 1.4, 1.7, 2]
 
 
@@ -61,7 +61,7 @@ for i in range(m):
     global_rhos.append(rho)
 
 alphas = [0.8,1.1,1.4,1.7,2]
-P = runif_in_simplex(m)
+P = runif_in_simplex(N)
 # Loop over different values of alpha
 for alpha in alphas:
     rhos = []
