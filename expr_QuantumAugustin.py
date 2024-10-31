@@ -40,7 +40,7 @@ def h(x, y, a):
 #             rX += P[j] * ei * (ui @ ui.H)
 #     return ans
 
-def step(sigma, rhos, P, a):
+def SimpleIteration(sigma, rhos, P, a):
     D = sigma.shape[0]
     ans = np.zeros((D, D))
     for i in range(len(P)):
@@ -76,7 +76,7 @@ for alpha in alphas:
     # Perform the iterative process
     T = 10
     for i in range(T):
-        sigma = step(sigma, rhos, P, alpha)
+        sigma = SimpleIteration(sigma, rhos, P, alpha)
         iterations.append(i+1)
         f_val = f(sigma / np.trace(sigma), rhos, P, alpha)
         f_values.append(f_val)
