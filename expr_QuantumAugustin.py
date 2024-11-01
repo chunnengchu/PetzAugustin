@@ -53,7 +53,7 @@ N = 2**5 # Cardinality of alphabet
 
 
 global_rhos = []
-for i in range(m):
+for i in range(N):
     rho = generate_psd(D)
     rho /= np.trace(rho)
     global_rhos.append(rho)
@@ -63,7 +63,7 @@ P = runif_in_simplex(N)
 # Loop over different values of alpha
 for alpha in alphas:
     rhos = []
-    for i in range(m):
+    for i in range(N): # Total O(N * D^3) time for initialization
         rhos.append(linalg.fractional_matrix_power(global_rhos[i],alpha)) # Taking matrix power of supported states beforehand
     
     sigma = np.identity(D) / D
