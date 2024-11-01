@@ -11,47 +11,45 @@ def generate_psd(D):
     qobj_density_matrix = qutip.rand_dm(D)
     return qobj_density_matrix.full()
 
-def f(sigma, rhos, P, a):
+def f(sigma, rhos, P, a): # fpetz
     ans = 0
+    sigma_power = linalg.fractional_matrix_power(sigma,1-a) # O(D^3) Precompute power of sigma
     for i in range(len(P)):
-        ans += P[i] * np.log(np.trace(rhos[i] @ linalg.fractional_matrix_power(sigma, 1-a)))
+        ans += P[i] * np.log(np.tensordot(rhos[i],sigma_power))
     return ans / (a - 1)
 
-def h(x, y, a):
-    if x == y:
-        return (1 - a) * x**(-a)
-    return (x**(1 - a) - y**(1 - a)) / (x - y)
+#def h(x, y, a):
+#    if x == y:
+#        return (1 - a) * x**(-a)
+#    return (x**(1 - a) - y**(1 - a)) / (x - y)
 
-# def gradf(X, As, P, a):
+# def gradf(X, rhos, P, a): # In case you want to compute gradient of f
 #     D = X.shape[0]
-#     tmp = step(X, As, P, a)
+#     tmp = SimpleIteration(X, rhos, P, a)
 #     tmp = linalg.fractional_matrix_power(tmp, a)
 #     ans = np.zeros((D, D))
 #     eig_vals, eig_vecs = linalg.eigh(X)
-#     rX = np.zeros((D, D))
 
-#     for j in range(len(P)):
-#         for i in range(D):
-#             for k in range(D):
-#                 ei, ek = eig_vals[i], eig_vals[k]
-#                 ui, uk = np.reshape(eig_vecs[:, i], (D, 1)), np.reshape(eig_vecs[:, k], (D, 1))
-#                 ui, uk = np.matrix(ui), np.matrix(uk)
-#                 ans += (P[j] * h(ei, ek, a) / (a - 1)) * ((ui @ ui.H) @ tmp @ (uk @ uk.H))
-#             rX += P[j] * ei * (ui @ ui.H)
+#     for i in range(D):
+#         for k in range(D):
+#             ei, ek = eig_vals[i], eig_vals[k]
+#             ui, uk = np.reshape(eig_vecs[:, i], (D, 1)), np.reshape(eig_vecs[:, k], (D, 1))
+#             ui, uk = np.matrix(ui), np.matrix(uk)
+#             ans += (h(ei, ek, a) / (a - 1)) * ((ui @ ui.H) @ tmp @ (uk @ uk.H))
 #     return ans
 
 def SimpleIteration(sigma, rhos, P, a):
     D = sigma.shape[0]
     ans = np.zeros((D, D))
-    for i in range(len(P)):
-        ans = ans + P[i] * rhos[i] / np.trace(rhos[i] @ linalg.fractional_matrix_power(sigma, 1-a))
-    ans = linalg.fractional_matrix_power(ans, 1/a)
+    sigma_power = linalg.fractional_matrix_power(sigma,1-a) # O(D^3) precompute sigma's power
+    for i in range(len(P)): # O(N)
+        ans = ans + P[i] * rhos[i] / np.tensordot(rhos[i],sigma_power) # O(D^2)
+    ans = linalg.fractional_matrix_power(ans, 1/a) #O(D^3)
     return ans
 
 # Experiment parameters
 D = 2**7 # Quantum state dimension
 N = 2**5 # Cardinality of alphabet
-alphas = [0.8, 1.1, 1.4, 1.7, 2]
 
 
 global_rhos = []
