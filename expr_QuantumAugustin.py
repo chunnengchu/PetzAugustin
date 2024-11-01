@@ -2,6 +2,14 @@ import numpy as np
 from scipy import linalg
 import matplotlib.pyplot as plt
 import qutip
+import random
+
+# Fix random seeds
+np.random.seed(1)
+random.seed(1)
+qutip.settings.rand_seed = 1
+
+
 # Helper functions
 def runif_in_simplex(d):
     k = np.random.exponential(scale=1.0, size=d)
