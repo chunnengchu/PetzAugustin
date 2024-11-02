@@ -23,7 +23,7 @@ def f(sigma, rhos, P, a): # fpetz
     ans = 0
     sigma_power = linalg.fractional_matrix_power(sigma,1-a) # O(D^3) Precompute power of sigma
     for i in range(len(P)):
-        ans += P[i] * np.log(np.tensordot(rhos[i],sigma_power))
+        ans += P[i] * np.log(np.tensordot(rhos[i].T,sigma_power))
     return ans / (a - 1)
 
 #def h(x, y, a):
@@ -51,7 +51,7 @@ def SimpleIteration(sigma, rhos, P, a):
     ans = np.zeros((D, D))
     sigma_power = linalg.fractional_matrix_power(sigma,1-a) # O(D^3) precompute sigma's power
     for i in range(len(P)): # O(N)
-        ans = ans + P[i] * rhos[i] / np.tensordot(rhos[i],sigma_power) # O(D^2)
+        ans = ans + P[i] * rhos[i] / np.tensordot(rhos[i].T,sigma_power) # O(D^2)
     ans = linalg.fractional_matrix_power(ans, 1/a) #O(D^3)
     return ans
 
