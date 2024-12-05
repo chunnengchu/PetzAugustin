@@ -101,8 +101,8 @@ for alpha in alphas:
     # f(X) vs iteration with log-scale y-axis
     # plt.subplot(1, 2, 1)
     plt.plot(iterations, f_values, label=f'f(X), alpha={alpha}')
-    plt.xlabel('Iteration',fontsize=20)
-    plt.ylabel('f(X/tr(X))-f*',fontsize=20)
+    plt.xlabel('Number of iterations',fontsize=20)
+    plt.ylabel('Approx. optimization error',fontsize=20)
     plt.yscale('log')  # Set log scale for y-axis
     plt.ylim(1e-11,1e-3)
     plt.tick_params(axis='both',which='major',labelsize=12)
