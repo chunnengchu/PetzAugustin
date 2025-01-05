@@ -66,7 +66,7 @@ for i in range(N):
     rho /= np.trace(rho)
     global_rhos.append(rho)
 
-alphas = [0.8,1.1,1.4,1.7,2]
+alphas = [0.8,1.5,3,5]
 P = runif_in_simplex(N)
 # Loop over different values of alpha
 for alpha in alphas:
@@ -80,7 +80,7 @@ for alpha in alphas:
     f_values = [f(sigma / np.trace(sigma), rhos, P, alpha)]
 
     # Perform the iterative process
-    T = 10
+    T = 30
     for i in range(T):
         sigma = SimpleIteration(sigma, rhos, P, alpha)
         iterations.append(i+1)
@@ -104,7 +104,99 @@ for alpha in alphas:
     plt.xlabel('Number of iterations',fontsize=20)
     plt.ylabel('Approx. optimization error',fontsize=20)
     plt.yscale('log')  # Set log scale for y-axis
-    plt.ylim(1e-11,1e-3)
+    plt.ylim(1e-11,1e-1)
+    plt.xlim(0, 13)
+    plt.tick_params(axis='both',which='major',labelsize=12)
+    plt.grid(True)
+
+    # # Log of norm vs iteration with log-scale y-axis
+    # plt.subplot(1, 2, 2)
+    # plt.plot(iterations, norm_logs, label=f'log(norm), alpha={alpha}', color='red')
+    # plt.xlabel('Iteration')
+    # plt.ylabel('log(norm)')
+    # plt.yscale('log')  # Set log scale for y-axis
+    # plt.title(f'Log of log(op-norm(-grad)) vs Iteration for alpha={alpha}')
+    # plt.grid(True)
+
+    plt.tight_layout()
+
+    # Save the figure with the name based on alpha
+    plt.savefig(f'figure_alpha_{alpha}.png')
+
+    # Show the plot (optional, you can comment this out if you don't want to display the figures)
+    plt.show()
+
+
+
+# Outside the range guaranteed to converge...
+N=3
+D=3
+# An instance that cause our proposed algorithm to fail when alpha < 0.5
+global_rhos = [
+    [
+        [0.9,0,0],
+        [0,0.09,0],
+        [0,0,0.01]
+    ],
+    [
+        [0.009,0,0],
+        [0,0.99,0],
+        [0,0,0.001]
+    ],
+    [
+        [0.0001,0,0],
+        [0,0.0009,0],
+        [0,0,0.999]
+    ]
+
+]
+for i in range(N):
+    #rho = generate_psd(D)
+    #rho /= np.trace(rho)
+    global_rhos[i]=np.array(global_rhos[i])
+    global_rhos[i]/=np.trace(global_rhos[i])
+
+alphas = [0.2,0.4]
+P = np.array([0.33,0.33,0.33])
+# Loop over different values of alpha
+for alpha in alphas:
+    rhos = []
+    for i in range(N): # Total O(N * D^3) time for initialization
+        rhos.append(linalg.fractional_matrix_power(global_rhos[i],alpha)) # Taking matrix power of supported states beforehand
+    
+    sigma = np.identity(D) / D
+    # Arrays to store iteration results
+    iterations = [0]
+    f_values = [f(sigma / np.trace(sigma), rhos, P, alpha)]
+
+    # Perform the iterative process
+    T = 10
+    for i in range(T):
+        sigma = SimpleIteration(sigma, rhos, P, alpha)
+        sigma/=np.trace(sigma)
+        iterations.append(i+1)
+        f_val = f(sigma / np.trace(sigma), rhos, P, alpha)
+        f_values.append(f_val)
+        print(alpha,f_val)
+
+    min_f_val = min(f_values)
+    for i in range(len(f_values)):
+        f_values[i] -= min_f_val
+    # f_values = f_values[:T//10]
+    # norm_logs = norm_logs[:T//10]
+    # iterations = iterations[:T//10]
+
+    # Plotting the results with log-scale y-axis
+    plt.figure(figsize=(6, 5))
+
+    # f(X) vs iteration with log-scale y-axis
+    # plt.subplot(1, 2, 1)
+    plt.plot(iterations, f_values, label=f'f(X), alpha={alpha}')
+    plt.xlabel('Number of iterations',fontsize=20)
+    plt.ylabel('Approx. optimization error',fontsize=20)
+    plt.yscale('log')  # Set log scale for y-axis
+    plt.ylim(1e-11,1e-1)
+    plt.xlim(0, 10)
     plt.tick_params(axis='both',which='major',labelsize=12)
     plt.grid(True)
 
