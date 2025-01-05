@@ -170,7 +170,7 @@ for alpha in alphas:
     f_values = [f(sigma / np.trace(sigma), rhos, P, alpha)]
 
     # Perform the iterative process
-    T = 10
+    T = 30
     for i in range(T):
         sigma = SimpleIteration(sigma, rhos, P, alpha)
         sigma/=np.trace(sigma)
@@ -196,7 +196,7 @@ for alpha in alphas:
     plt.ylabel('Approx. optimization error',fontsize=20)
     plt.yscale('log')  # Set log scale for y-axis
     plt.ylim(1e-11,1e-1)
-    plt.xlim(0, 10)
+    plt.xlim(0, 13)
     plt.tick_params(axis='both',which='major',labelsize=12)
     plt.grid(True)
 
