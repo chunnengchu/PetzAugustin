@@ -6,7 +6,7 @@ $ python expr_QuantumAugustin.py
 ```
 ## Challenging Instance
 input alphabet : {1,2,3}\
-classical-quantum channel outputs : $$\rho_B^1=\mathrm{Diag}\left(\left(0.6,0.36,0.04\right)\right),\rho_B^2=\mathrm{Diag}\left(\left(0.21,0.7,0.09\right)\right),\rho_B^3=\mathrm{Diag}\left(\left(0.04,0.16,0.8\right)\right)$$\
+classical-quantum channel outputs : $$\rho_B^1=\mathrm{Diag}\left(\left(0.9,0.09,0.01\right)\right),\rho_B^2=\mathrm{Diag}\left(\left(0.009,0.99,0.001\right)\right),\rho_B^3=\mathrm{Diag}\left(\left(0.0001,0.0009,0.999\right)\right)$$\
 probability distribution : $$P_X(1)=P_X(2)=P_X(3)=\frac{1}{3}$$
 ## References
 We use the QuTip package.\

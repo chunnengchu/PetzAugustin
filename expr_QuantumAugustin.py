@@ -57,7 +57,7 @@ def gradf(X, rhos, P, a, Diagonal=False): # In case you want to compute gradient
                 ans += (h(ei, ek, a) / (a - 1)) * ((ui @ ((ui.H @ tmp) @ uk) @ uk.H))
     return ans
 def Polyak(rhos,P,a, Diagonal=False):
-    delta_t, delta, gamma, beta, c = 2.5, 1e-11, 1.25, 0.75, 0.1
+    delta_t, delta, gamma, beta, c = 2.5, 1e-11, 1.25, 0.75, 0.05
     T = 30
     D = rhos[0].shape[0]
     sigma_t = np.identity(D) / D
@@ -153,7 +153,7 @@ for alpha in alphas:
 
     last_f_val = f_values[-1] # Last iterate is guaranteed to converge.
     for i in range(len(f_values)):
-        f_values[i] = abs(f_values[i]-last_f_val) # Calculate the distance instead.
+        f_values[i] = f_values[i]-last_f_val 
 
     # Plotting the results with log-scale y-axis
     plt.figure(figsize=(6, 5))
@@ -194,19 +194,19 @@ D=3
 # An instance that cause our proposed algorithm to fail when alpha < 0.5
 global_rhos = [
     [
-        [0.6,0,0],
-        [0,0.36,0],
-        [0,0,0.04]
+        [0.9,0,0],
+        [0,0.09,0],
+        [0,0,0.001]
     ],
     [
-        [0.21,0,0],
-        [0,0.7,0],
-        [0,0,0.09]
+        [0.009,0,0],
+        [0,0.99,0],
+        [0,0,0.001]
     ],
     [
-        [0.04,0,0],
-        [0,0.16,0],
-        [0,0,0.8]
+        [0.0001,0,0],
+        [0,0.0009,0],
+        [0,0,0.999]
     ]
 
 ]
@@ -233,6 +233,7 @@ for alpha in alphas:
     T = 30
     for i in range(T):
         sigma = SimpleIteration(sigma, rhos, P, alpha,Diagonal=True)
+        sigma /= np.trace(sigma) # Since our iteration rule is homogeneous, its ok to normalize for every round
         iterations.append(i+1)
         f_val = f(sigma, rhos, P, alpha,Diagonal=True)
         f_values.append(f_val)
@@ -244,7 +245,7 @@ for alpha in alphas:
                                        # proved to converge for alpha < 0.5
     print("Minimum computed by Polyak",min_f_val)
     for i in range(len(f_values)):
-        f_values[i] = abs(f_values[i]-min_f_val) # Compute the distance instead.
+        f_values[i] = f_values[i]-min_f_val
     # f_values = f_values[:T//10]
     # norm_logs = norm_logs[:T//10]
     # iterations = iterations[:T//10]
