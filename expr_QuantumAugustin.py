@@ -19,16 +19,23 @@ def generate_psd(D):
     qobj_density_matrix = qutip.rand_dm(D)
     return qobj_density_matrix.full()
 
-def f(sigma, rhos, P, a, Diagonal=False): # fpetz
+def ThompSonMetric(U,V):
+    U_inv_sqrt = linalg.fractional_matrix_power(U, -0.5)
+    V_inv_sqrt = linalg.fractional_matrix_power(V, -0.5)
+    val1 = linalg.norm(U_inv_sqrt @ V @ U_inv_sqrt, 2)
+    val2 = linalg.norm(V_inv_sqrt @ U @ V_inv_sqrt, 2)
+    return np.log(max(val1, val2))
+
+def F(Q, As, w, a, Diagonal=False): # fpetz
     ans = 0
     if(Diagonal): # If all matrices are diagonal (classical case), we can compute faster
-        sigma_power = np.diag(sigma)**(1-a)
-        for i in range(len(P)):
-            ans += P[i] * np.log(np.dot(np.diag(rhos[i]),sigma_power))
+        Q_power = np.diag(Q)**(1-a)
+        for i in range(len(w)):
+            ans += w[i] * np.log(np.dot(np.diag(As[i]),Q_power))
     else:  
-        sigma_power = linalg.fractional_matrix_power(sigma,1-a) # O(D^3) Precompute power of sigma
-        for i in range(len(P)):
-            ans += P[i] * np.log(np.tensordot(rhos[i].T,sigma_power))
+        Q_power = linalg.fractional_matrix_power(Q,1-a) # O(D^3) Precompute power of Q
+        for i in range(len(w)):
+            ans += w[i] * np.log(np.tensordot(As[i].T,Q_power))
     return ans / (a - 1)
 
 def h(x, y, a):
@@ -36,15 +43,15 @@ def h(x, y, a):
        return (1 - a) * x**(-a)
    return (x**(1 - a) - y**(1 - a)) / (x - y)
 
-def gradf(X, rhos, P, a, Diagonal=False): # In case you want to compute gradient of f
-    D = X.shape[0]
+def gradF(Q, As, w, a, Diagonal=False): # In case you want to compute gradient of f
+    D = Q.shape[0]
     if(Diagonal): # If all matrices are diagonal (classical case), we can compute faster
-        tmp = SimpleIteration(X, rhos, P, a, Diagonal)
+        tmp = SimpleIteration(Q, As, w, a, Diagonal)
         tmp = np.diag(tmp)**a
-        ans = tmp * (np.diag(X)**(-a))
+        ans = tmp * (np.diag(Q)**(-a))
         ans = -np.diag(ans)
     else:
-        tmp = SimpleIteration(X, rhos, P, a)
+        tmp = SimpleIteration(Q, As, w, a)
         tmp = linalg.fractional_matrix_power(tmp, a)
         ans = np.zeros((D, D))
         eig_vals, eig_vecs = linalg.eigh(X)
@@ -56,65 +63,68 @@ def gradf(X, rhos, P, a, Diagonal=False): # In case you want to compute gradient
                 ui, uk = np.matrix(ui), np.matrix(uk)
                 ans += (h(ei, ek, a) / (a - 1)) * ((ui @ ((ui.H @ tmp) @ uk) @ uk.H))
     return ans
-def Polyak(rhos,P,a, Diagonal=False):
+def Polyak(As,w,a, Diagonal=False):
     delta_t, delta, gamma, beta, c = 2.5, 1e-11, 1.25, 0.75, 0.05
-    T = 30
-    D = rhos[0].shape[0]
-    sigma_t = np.identity(D) / D
-    min_f = float('inf')
+    T = 1000
+    D = As[0].shape[0]
+    Q_t = np.identity(D) / D
+    min_F = float('inf')
+    Q_star = Q_t
     if(Diagonal): # If all matrices are diagonal (classical case), we can compute faster
-        f_val = f(sigma_t,rhos,P,a,Diagonal)
+        F_val = F(Q_t,As,w,a,Diagonal)
         for t in range(T):
-            
-            min_f = min(f_val,min_f)
-            ft_tilde = min_f - delta_t
-            grad =  gradf(sigma_t,rhos,P,a,Diagonal)
+            if(F_val < min_F):
+                min_F = F_val
+                Q_star = Q_t
+            Ft_tilde = min_F - delta_t
+            grad =  gradF(Q_t,As,w,a,Diagonal)
             if(t%(T//10)==0):
-                print("polyak",f_val,np.diag(sigma_t))
+                print("polyak",F_val,np.diag(Q_t))
             grad_norm_square = np.tensordot(grad.T,grad)
-            eta_t = (f_val-ft_tilde)/(c*grad_norm_square)
-            sigma_t = np.diag(sigma_t)*np.exp(-eta_t*np.diag(grad))
-            sigma_t = np.diag(sigma_t)
-            sigma_t /= np.trace(sigma_t)
-            f_val = f(sigma_t,rhos,P,a,Diagonal=True)
-            if(f_val<=ft_tilde):
+            eta_t = (F_val-Ft_tilde)/(c*grad_norm_square)
+            Q_t = np.diag(Q_t)*np.exp(-eta_t*np.diag(grad))
+            Q_t = np.diag(Q_t)
+            Q_t /= np.trace(Q_t)
+            F_val = F(Q_t,As,w,a,Diagonal=True)
+            if(F_val<=Ft_tilde):
                 delta_t *= gamma
             else:
                 delta_t = max(beta*delta_t,delta)
     else:
-        f_val = f(sigma_t,rhos,P,a)
+        F_val = F(Q_t,As,w,a)
         for t in range(T):
-            min_f = min(f_val,min_f)
-            ft_tilde = min_f - delta_t
-            grad = gradf(sigma_t,rhos,P,a)
+            if(F_val < min_F):
+                min_F = F_val
+                Q_star = Q_t
+            Ft_tilde = min_F - delta_t
+            grad = gradF(Q_t,As,w,a)
             grad_norm_square = np.tensordot(grad.T,grad)
-            eta_t = (f_val-min_f)/(c*grad_norm_square)
-            sigma_t = linalg.expm(linalg.logm(sigma_t)-eta_t*grad)
-            sigma_t /= np.trace(sigma_t)
-            f_val = f(sigma_t,rhos,P,a)
-            if(f_val<=ft_tilde):
+            eta_t = (F_val-min_F)/(c*grad_norm_square)
+            Q_t = linalg.expm(linalg.logm(Q_t)-eta_t*grad)
+            Q_t /= np.trace(Q_t)
+            F_val = F(Q_t,As,w,a)
+            if(F_val<=Ft_tilde):
                 delta_t *= gamma
             else:
                 delta_t = max(beta*delta_t,delta)
-    return min_f
+    return min_F, Q_star
 
-
-def SimpleIteration(sigma, rhos, P, a, Diagonal=False):
-    D = sigma.shape[0]
+def SimpleIteration(Q, As, w, a, Diagonal=False):
+    D = Q.shape[0]
     if(Diagonal): # If all matrices are diagonal (classical case), we can compute faster
         ans = np.zeros(D)
-        sigma_power=np.diag(sigma)**(1-a)
-        for i in range(len(P)):
-            ans += P[i] * np.diag(rhos[i])/np.dot(np.diag(rhos[i]),sigma_power)
+        Q_power=np.diag(Q)**(1-a)
+        for i in range(len(w)):
+            ans += w[i] * np.diag(As[i])/np.dot(np.diag(As[i]),Q_power)
         ans = ans**(1/a)
         ans = np.diag(ans)
 
             
     else:   
         ans = np.zeros((D, D))
-        sigma_power = linalg.fractional_matrix_power(sigma,1-a) # O(D^3) precompute sigma's power
-        for i in range(len(P)): # O(N)
-            ans = ans + P[i] * rhos[i] / np.tensordot(rhos[i].T,sigma_power) # O(D^2)
+        Q_power = linalg.fractional_matrix_power(Q,1-a) # O(D^3) precompute sigma's power
+        for i in range(len(w)): # O(N)
+            ans = ans + w[i] * As[i] / np.tensordot(As[i].T,Q_power) # O(D^2)
         ans = linalg.fractional_matrix_power(ans, 1/a) #O(D^3)
     return ans
 
@@ -123,67 +133,69 @@ D = 2**7 # Quantum state dimension
 N = 2**5 # Cardinality of alphabet
 
 
-global_rhos = []
+global_As = []
 for i in range(N):
-    rho = generate_psd(D)
-    rho /= np.trace(rho)
-    global_rhos.append(rho)
+    Ai = generate_psd(D)
+    Ai /= np.trace(Ai)
+    global_As.append(Ai)
 
 alphas = [0.8,1.5,3,5]
-P = runif_in_simplex(N)
+w = runif_in_simplex(N)
 # Loop over different values of alpha
 for alpha in alphas:
-    rhos = []
+    As = []
     for i in range(N): # Total O(N * D^3) time for initialization
-        rhos.append(linalg.fractional_matrix_power(global_rhos[i],alpha)) # Taking matrix power of supported states beforehand
+        As.append(linalg.fractional_matrix_power(global_As[i],alpha)) # Taking matrix power of supported states beforehand
     
-    sigma = np.identity(D) / D
+    Q = np.identity(D) / D
     # Arrays to store iteration results
     iterations = [0]
-    f_values = [f(sigma / np.trace(sigma), rhos, P, alpha)]
+    iterates = [Q]
+    F_values = [F(Q / np.trace(Q), As, w, alpha)]
 
     # Perform the iterative process
-    T = 30
+    T = 60
     for i in range(T):
-        sigma = SimpleIteration(sigma, rhos, P, alpha)
+        Q = SimpleIteration(Q, As, w, alpha)
         iterations.append(i+1)
-        f_val = f(sigma / np.trace(sigma), rhos, P, alpha)
-        f_values.append(f_val)
-        print(alpha,f_val)
+        F_val = F(Q / np.trace(Q), As, w, alpha)
+        F_values.append(F_val)
+        iterates.append(Q / np.trace(Q))
+        print(alpha,F_val)
 
-    last_f_val = f_values[-1] # Last iterate is guaranteed to converge.
-    for i in range(len(f_values)):
-        f_values[i] = f_values[i]-last_f_val 
+    last_F_val = F_values[-1] # Last iterate is guaranteed to converge.
+    distances_to_opt = []
+    last_iterate_power = linalg.fractional_matrix_power(iterates[-1],1-alpha)
+    for i in range(len(F_values)):
+        F_values[i] = F_values[i]-last_F_val 
+        distances_to_opt.append(ThompSonMetric(linalg.fractional_matrix_power(iterates[i],1-alpha),last_iterate_power))
 
-    # Plotting the results with log-scale y-axis
-    plt.figure(figsize=(6, 5))
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
-    # f(X) vs iteration with log-scale y-axis
-    # plt.subplot(1, 2, 1)
-    plt.plot(iterations, f_values, label=f'f(X), alpha={alpha}')
-    plt.xlabel('Number of iterations',fontsize=20)
-    plt.ylabel('Approx. optimization error',fontsize=20)
-    plt.yscale('log')  # Set log scale for y-axis
-    plt.ylim(1e-11,1e-1)
-    plt.xlim(0, 13)
-    plt.tick_params(axis='both',which='major',labelsize=12)
-    plt.grid(True)
+    # Left: Optimization error
+    axs[0].plot(iterations, F_values, label='Optimization error')
+    axs[0].set_yscale('log')
+    axs[0].set_xlabel('Number of iterations', fontsize=14)
+    axs[0].set_ylabel('Approx. optimization error', fontsize=14)
+    axs[0].set_title(f'α = {alpha}', fontsize=14)
+    axs[0].set_xlim(0, 30)
+    axs[0].set_ylim(1e-11, 1e1)
+    axs[0].grid(True)
+    axs[0].tick_params(labelsize=12)
 
-    # # Log of norm vs iteration with log-scale y-axis
-    # plt.subplot(1, 2, 2)
-    # plt.plot(iterations, norm_logs, label=f'log(norm), alpha={alpha}', color='red')
-    # plt.xlabel('Iteration')
-    # plt.ylabel('log(norm)')
-    # plt.yscale('log')  # Set log scale for y-axis
-    # plt.title(f'Log of log(op-norm(-grad)) vs Iteration for alpha={alpha}')
-    # plt.grid(True)
+    # Right: Distance to optimality
+    axs[1].plot(iterations, distances_to_opt, label='Distance to $Q_\star$')
+    axs[1].set_yscale('log')
+    axs[1].set_xlabel('Number of iterations', fontsize=14)
+    axs[1].set_ylabel('Approx. iter. error', fontsize=14)
+    axs[1].set_title(f'α = {alpha}', fontsize=14)
+    axs[1].set_xlim(0, 30)
+    axs[1].set_ylim(1e-11, 1e1)
+    axs[1].grid(True)
+    axs[1].tick_params(labelsize=12)
 
     plt.tight_layout()
-
-    # Save the figure with the name based on alpha
     plt.savefig(f'figure_alpha_{alpha}.png')
-
-    # Show the plot (optional, you can comment this out if you don't want to display the figures)
     plt.show()
 
 
@@ -192,7 +204,7 @@ for alpha in alphas:
 N=3
 D=3
 # An instance that cause our proposed algorithm to fail when alpha < 0.5
-global_rhos = [
+global_As = [
     [
         [0.9,0,0],
         [0,0.09,0],
@@ -213,74 +225,76 @@ global_rhos = [
 for i in range(N):
     #rho = generate_psd(D)
     #rho /= np.trace(rho)
-    global_rhos[i]=np.array(global_rhos[i])
-    global_rhos[i]/=np.trace(global_rhos[i])
+    global_As[i]=np.array(global_As[i])
+    global_As[i]/=np.trace(global_As[i])
 
 alphas = [0.2,0.4]
-P = np.array([1/3,1/3,1/3])
+w = np.array([1/3,1/3,1/3])
 # Loop over different values of alpha
 for alpha in alphas:
-    rhos = []
+    As = []
     for i in range(N): # Total O(N * D^3) time for initialization
-        rhos.append(np.diag(np.diag(global_rhos[i])**alpha)) # Taking matrix power of supported states beforehand
+        As.append(np.diag(np.diag(global_As[i])**alpha)) # Taking matrix power of supported states beforehand
     
-    sigma = np.identity(D) / D
+    Q = np.identity(D) / D
     # Arrays to store iteration results
     iterations = [0]
-    f_values = [f(sigma, rhos, P, alpha)]
+    iterates = [Q]
+    F_values = [F(Q / np.trace(Q), As, w, alpha, Diagonal=True)]
 
     # Perform the iterative process
-    T = 30
+    T = 60
     for i in range(T):
-        sigma = SimpleIteration(sigma, rhos, P, alpha,Diagonal=True)
-        sigma /= np.trace(sigma) # Since our iteration rule is homogeneous, its ok to normalize for every round
+        Q = SimpleIteration(Q, As, w, alpha, Diagonal = True)
+        Q /= np.trace(Q) # We deliberately take normalization here for the sake of numerical stability. It is easy to verify that it won't affect the output of the algorithm.
         iterations.append(i+1)
-        f_val = f(sigma, rhos, P, alpha,Diagonal=True)
-        f_values.append(f_val)
-        print(alpha,f_val,np.diag(sigma))
+        F_val = F(Q, As, w, alpha, Diagonal = True)
+        F_values.append(F_val)
+        iterates.append(Q)
+        print(alpha,F_val,np.diag(Q))
+
 
     #min_f_val = min(f_values)
-    min_f_val = Polyak(rhos, P, alpha,Diagonal=True) # Use mirror descent with Polyak stepsize to compute
+    min_F_val, Q_star = Polyak(As, w, alpha, Diagonal=True) # Use mirror descent with Polyak stepsize to compute
                                        # minimum value instead. As our algorithm is not 
                                        # proved to converge for alpha < 0.5
-    print("Minimum computed by Polyak",min_f_val)
-    for i in range(len(f_values)):
-        f_values[i] = f_values[i]-min_f_val
-    # f_values = f_values[:T//10]
-    # norm_logs = norm_logs[:T//10]
-    # iterations = iterations[:T//10]
+    print("Minimum computed by Polyak",min_F_val)
+    # for i in range(len(F_values)):
+    #     F_values[i] = F_values[i]-min_F_val
+    distances_to_opt = []
+    Q_star_power = linalg.fractional_matrix_power(Q_star,1-alpha)
+    for i in range(len(F_values)):
+        F_values[i] = F_values[i]-min_F_val 
+        distances_to_opt.append(ThompSonMetric(linalg.fractional_matrix_power(iterates[i],1-alpha),Q_star_power))
+        print("Distance",distances_to_opt[-1])
 
-    # Plotting the results with log-scale y-axis
-    plt.figure(figsize=(6, 5))
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
-    # f(X) vs iteration with log-scale y-axis
-    # plt.subplot(1, 2, 1)
-    plt.plot(iterations, f_values, label=f'f(X), alpha={alpha}')
-    plt.xlabel('Number of iterations',fontsize=20)
-    plt.ylabel('Approx. optimization error',fontsize=20)
-    plt.yscale('log')  # Set log scale for y-axis
-    plt.ylim(1e-11,1e-1)
-    plt.xlim(0, 13)
-    plt.tick_params(axis='both',which='major',labelsize=12)
-    plt.grid(True)
+    # Left: Optimization error
+    axs[0].plot(iterations, F_values, label='Optimization error')
+    axs[0].set_yscale('log')
+    axs[0].set_xlabel('Number of iterations', fontsize=14)
+    axs[0].set_ylabel('Approx. optimization error', fontsize=14)
+    axs[0].set_title(f'α = {alpha}', fontsize=14)
+    axs[0].set_xlim(0, 30)
+    axs[0].set_ylim(1e-11, 1e1)
+    axs[0].grid(True)
+    axs[0].tick_params(labelsize=12)
 
-    # # Log of norm vs iteration with log-scale y-axis
-    # plt.subplot(1, 2, 2)
-    # plt.plot(iterations, norm_logs, label=f'log(norm), alpha={alpha}', color='red')
-    # plt.xlabel('Iteration')
-    # plt.ylabel('log(norm)')
-    # plt.yscale('log')  # Set log scale for y-axis
-    # plt.title(f'Log of log(op-norm(-grad)) vs Iteration for alpha={alpha}')
-    # plt.grid(True)
+    # Right: Distance to optimality
+    axs[1].plot(iterations, distances_to_opt, label='Distance to $Q_\star$')
+    axs[1].set_yscale('log')
+    axs[1].set_xlabel('Number of iterations', fontsize=14)
+    axs[1].set_ylabel('Approx. iter. error', fontsize=14)
+    axs[1].set_title(f'α = {alpha}', fontsize=14)
+    axs[1].set_xlim(0, 30)
+    axs[1].set_ylim(1e-11, 1e1)
+    axs[1].grid(True)
+    axs[1].tick_params(labelsize=12)
 
     plt.tight_layout()
-
-    # Save the figure with the name based on alpha
     plt.savefig(f'figure_alpha_{alpha}.png')
-
-    # Show the plot (optional, you can comment this out if you don't want to display the figures)
     plt.show()
-
 
 
 

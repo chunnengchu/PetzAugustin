@@ -1,5 +1,5 @@
 # PetzAugustin
-A demonstration of our fix point iteration for computing Petz-Augustin information.
+A demonstration of our fix point iteration for computing Petz-Augustin mean.
 ## Run 
 ```
 $ python expr_QuantumAugustin.py
