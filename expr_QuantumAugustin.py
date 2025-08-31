@@ -130,10 +130,10 @@ def SimpleIteration(Q, As, w, a, Diagonal=False):
 
 # Experiment parameters
 D = 2**7 # Quantum state dimension
-N = 2**5 # Cardinality of alphabet
+N = 2**5 # Number of quantum states (Cardinality of input alphabet)
 
 
-global_As = []
+global_As = [] # Set of quantum states
 for i in range(N):
     Ai = generate_psd(D)
     Ai /= np.trace(Ai)
